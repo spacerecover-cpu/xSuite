@@ -40,6 +40,7 @@ import {
   captureIntakeConsents,
   requireDepositorId,
   DevicesInCustodyError,
+  IntakeConsentError,
   type CreateCaseWithDevicesResult,
 } from '../../lib/caseIntakeService';
 import { useCompanyName } from '../../components/customers/WhatsAppConsentBlock';
@@ -57,6 +58,12 @@ interface CheckedInCase {
    * second set of DEVICE_RECEIVED events, was written.
    */
   alreadyRecorded?: boolean;
+  /**
+   * True only when device rows came back with ids. A REJECTED insert and an
+   * insert whose response was lost are indistinguishable, so an empty list means
+   * "may or may not be in custody" — never assert custody from it.
+   */
+  devicesConfirmed?: boolean;
 }
 
 /**
@@ -69,7 +76,10 @@ interface CheckedInCase {
 interface StalledCheckIn extends CheckedInCase {
   consentOnly: boolean;
   whatsappPending: boolean;
+  /** The custody event itself is missing — it has no other in-app writer. */
   destructivePending: boolean;
+  /** Custody landed, only the internal note is missing — re-creatable in-app. */
+  destructiveNotePending: boolean;
 }
 
 function useCatalog(table: 'catalog_device_types' | 'catalog_device_brands' | 'catalog_device_capacities' | 'catalog_device_conditions', key: string) {
@@ -230,12 +240,18 @@ export function CaseCheckIn() {
         // The devices may already be in custody even though creation rejected —
         // record the identity so onError lands on the stalled screen instead of
         // letting the operator retry one physical hand-over into two cases.
-        if (error instanceof DevicesInCustodyError) createdCase.current = error.created;
+        if (error instanceof DevicesInCustodyError) {
+          createdCase.current = {
+            caseId: error.created.caseId,
+            caseNumber: error.created.caseNumber,
+            devicesConfirmed: error.created.deviceIds.length > 0,
+          };
+        }
         throw error;
       }
 
       const { caseId, caseNumber, deviceIds } = created;
-      createdCase.current = { caseId, caseNumber };
+      createdCase.current = { caseId, caseNumber, devicesConfirmed: deviceIds.length > 0 };
 
       // The evidence steps below already ran on the submit that created this case.
       // Re-running them would raise a second receipt instance and a second
@@ -307,13 +323,21 @@ export function CaseCheckIn() {
         toast.error(`Check-in failed: ${error.message}`);
         return;
       }
-      const whatsappPending = consentStepReached.current && ack.whatsappUtility;
-      const destructivePending = consentStepReached.current && ack.destructiveAuthorized;
+      // What actually landed, not what the operator ticked — the two diverge
+      // exactly when a consent write fails half way.
+      const recorded = error instanceof IntakeConsentError ? error.recorded : null;
+      const whatsappPending = consentStepReached.current && ack.whatsappUtility
+        && !(recorded?.whatsapp ?? false);
+      const destructivePending = consentStepReached.current && ack.destructiveAuthorized
+        && !(recorded?.destructiveCustody ?? false);
+      const destructiveNotePending = consentStepReached.current && ack.destructiveAuthorized
+        && (recorded?.destructiveCustody ?? false) && !(recorded?.destructiveNote ?? false);
       setStalled({
         ...created,
-        consentOnly: whatsappPending || destructivePending,
+        consentOnly: whatsappPending || destructivePending || destructiveNotePending,
         whatsappPending,
         destructivePending,
+        destructiveNotePending,
       });
     },
   });
@@ -347,7 +371,9 @@ export function CaseCheckIn() {
           <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">
             {stalled.consentOnly
               ? 'The devices are in custody and the signed receipt, depositor identity and custody event are all recorded — only the consent step did not complete. Checking in again would take the same devices into custody a second time, so this check-in cannot be retried.'
-              : 'The devices are in custody, but the signed receipt, depositor identity or custody event did not complete. Checking in again would take the same devices into custody a second time, so this check-in cannot be retried.'}
+              : stalled.devicesConfirmed
+                ? 'The devices are in custody, but the signed receipt, depositor identity or custody event did not complete. Checking in again would take the same devices into custody a second time, so this check-in cannot be retried.'
+                : `${stalled.caseNumber} was created, but the devices may or may not have been recorded against it — the request failed at exactly the point that is impossible to tell apart from the outside. Checking in again could take the same devices into custody twice, so this check-in cannot be retried.`}
           </p>
           {stalled.consentOnly ? (
             <div className="mx-auto mt-3 max-w-md text-start text-sm text-slate-500">
@@ -361,16 +387,24 @@ export function CaseCheckIn() {
                 )}
                 {stalled.destructivePending && (
                   <li>
-                    The authorization for recovery attempts that may alter the media — as an
-                    internal note on {stalled.caseNumber}, before those attempts begin.
+                    The authorization for recovery attempts that may alter the media did not reach
+                    the custody log, and no screen can append it after the fact. Escalate{' '}
+                    {stalled.caseNumber} to a lab administrator before those attempts begin.
+                  </li>
+                )}
+                {stalled.destructiveNotePending && (
+                  <li>
+                    The authorization is in the custody log, but its internal note is missing — add
+                    it on {stalled.caseNumber} so the next engineer sees it.
                   </li>
                 )}
               </ul>
             </div>
           ) : (
             <p className="mx-auto mt-3 max-w-md text-sm text-slate-500">
-              No screen in the app can write the missing intake evidence after the fact. Keep the
-              paper receipt with the devices and escalate {stalled.caseNumber} to a lab administrator.
+              {stalled.devicesConfirmed
+                ? `No screen in the app can write the missing intake evidence after the fact. Keep the paper receipt with the devices and escalate ${stalled.caseNumber} to a lab administrator.`
+                : `Open ${stalled.caseNumber} and check which devices were recorded. Add any that are missing there — that records them properly. Keep the paper receipt with the devices and escalate if anything looks wrong.`}
             </p>
           )}
 

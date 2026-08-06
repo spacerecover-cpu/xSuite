@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { IntakeConsentError } from '../../lib/caseIntakeService';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { HeaderSlotProvider } from '../../contexts/HeaderSlotContext';
 import { DevicesInCustodyError } from '../../lib/caseIntakeService';
@@ -427,7 +428,15 @@ describe('CaseCheckIn', () => {
   });
 
   it('names the screens that can still record consent when only that step failed', async () => {
-    spies.captureIntakeConsents.mockRejectedValue(new Error('rls denied'));
+    // Custody landed, only the note is missing — the one shape where the note
+    // really IS the remedy.
+    spies.captureIntakeConsents.mockRejectedValue(
+      new IntakeConsentError('partial', {
+        whatsapp: false,
+        destructiveCustody: true,
+        destructiveNote: false,
+      }),
+    );
     const user = userEvent.setup();
     renderPage();
     await pickCustomer(user);
@@ -439,12 +448,36 @@ describe('CaseCheckIn', () => {
 
     expect(await screen.findByText(/CASE-0042 was created/i)).toBeInTheDocument();
     expect(screen.getByText(/Edit Profile → WhatsApp updates/i)).toBeInTheDocument();
-    expect(screen.getByText(/as an internal note on CASE-0042/i)).toBeInTheDocument();
+    expect(screen.getByText(/its internal note is missing/i)).toBeInTheDocument();
     // Both missing facts are re-recordable in-app: this screen must never send a
     // re-tickable checkbox to an administrator as if it were unwritable.
     expect(screen.queryByText(/escalate/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/No screen in the app/i)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /complete check-in/i })).not.toBeInTheDocument();
+  });
+
+  // The custody event has no other in-app writer, so when IT is what failed the
+  // screen must escalate rather than offer a note that cannot restore it.
+  it('escalates when the destructive authorization never reached the custody log', async () => {
+    spies.captureIntakeConsents.mockRejectedValue(
+      new IntakeConsentError('partial', {
+        whatsapp: true,
+        destructiveCustody: false,
+        destructiveNote: false,
+      }),
+    );
+    const user = userEvent.setup();
+    renderPage();
+    await pickCustomer(user);
+    await fillOneDevice(user);
+    await user.click(await screen.findByLabelText(/accept the terms/i));
+    await user.click(screen.getByLabelText(/permanently alter the media/i));
+    await user.click(submitButton());
+
+    expect(await screen.findByText(/did not reach the custody log/i)).toBeInTheDocument();
+    expect(screen.getByText(/Escalate/i)).toBeInTheDocument();
+    // The WhatsApp opt-in DID land, so it must not be listed as outstanding.
+    expect(screen.queryByText(/Edit Profile → WhatsApp updates/i)).not.toBeInTheDocument();
   });
 
   it('lists only the consent the customer actually gave', async () => {

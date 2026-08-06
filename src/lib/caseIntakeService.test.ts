@@ -18,6 +18,7 @@ import {
   captureIntakeConsents,
   createCaseWithDevices,
   DevicesInCustodyError,
+  IntakeConsentError,
   logCaseIntake,
   requireDepositorId,
   signIntakeReceipt,
@@ -548,9 +549,11 @@ describe('captureIntakeConsents', () => {
       insert: () => Promise.resolve({ data: null, error: { message: 'rls denied' } }),
     }));
 
+    // Wrapped rather than raw: the surface needs to know WHAT landed, not just
+    // that something failed.
     await expect(
       captureIntakeConsents({ ...baseConsents, whatsappUtility: true }),
-    ).rejects.toMatchObject({ message: 'rls denied' });
+    ).rejects.toBeInstanceOf(IntakeConsentError);
   });
 });
 
@@ -688,5 +691,89 @@ describe('createCaseWithDevices — intake idempotency', () => {
 
     expect(calls).not.toContain('cases-lookup');
     expect(result).toMatchObject({ caseId: 'case-1', caseNumber: 'CASE-0042' });
+  });
+});
+
+// The stall screen used to compute its remedy list from the operator's INTENT
+// flags, so a half-written consent step was reported as fully missing (or fully
+// done). It has to be told what actually landed.
+describe('captureIntakeConsents — partial writes are reported, not guessed', () => {
+  const base = {
+    tenantId: 't1',
+    customerId: 'cust-1',
+    caseId: 'case-1',
+    phoneE164: '+441234567890',
+    consentText: 'I agree',
+    whatsappUtility: true,
+    destructiveAuthorized: true,
+  };
+
+  function wire(opts: { whatsappError?: unknown; noteError?: unknown; custodyError?: unknown }) {
+    calls = [];
+    from.mockReset();
+    rpc.mockReset();
+    from.mockImplementation((table: string) => ({
+      insert: vi.fn(() => {
+        calls.push(table);
+        const error =
+          table === 'whatsapp_consents' ? opts.whatsappError : opts.noteError;
+        return Promise.resolve({ data: null, error: error ?? null });
+      }),
+    }));
+    rpc.mockImplementation((fn: string) => {
+      calls.push(`rpc:${fn}`);
+      return Promise.resolve({ data: null, error: opts.custodyError ?? null });
+    });
+  }
+
+  it('appends the custody event before the internal note', async () => {
+    wire({});
+    await captureIntakeConsents(base);
+    expect(calls.indexOf('rpc:log_chain_of_custody')).toBeLessThan(
+      calls.indexOf('case_internal_notes'),
+    );
+  });
+
+  // The custody event has no other in-app writer, so it must never be the thing
+  // left behind. If it cannot be appended, nothing for that consent is written.
+  it('does not write the note when the custody event could not be appended', async () => {
+    wire({ custodyError: { message: 'rls denied' } });
+    await expect(captureIntakeConsents(base)).rejects.toBeInstanceOf(IntakeConsentError);
+    expect(calls).not.toContain('case_internal_notes');
+  });
+
+  it('reports exactly what landed when the note fails after the custody event', async () => {
+    wire({ noteError: { message: 'boom' } });
+    await captureIntakeConsents(base).catch((e: IntakeConsentError) => {
+      expect(e.recorded).toEqual({
+        whatsapp: true,
+        destructiveCustody: true,
+        destructiveNote: false,
+      });
+    });
+    expect.assertions(1);
+  });
+
+  // The destructive authorization is the legally significant one; a messaging
+  // opt-in failing must not cost the lab that record.
+  it('still records the destructive authorization when the WhatsApp consent fails', async () => {
+    wire({ whatsappError: { message: 'duplicate' } });
+    await captureIntakeConsents(base).catch((e: IntakeConsentError) => {
+      expect(e.recorded.whatsapp).toBe(false);
+      expect(e.recorded.destructiveCustody).toBe(true);
+      expect(e.recorded.destructiveNote).toBe(true);
+    });
+    expect(calls).toContain('rpc:log_chain_of_custody');
+  });
+
+  it('resolves without throwing when every requested consent lands', async () => {
+    wire({});
+    await expect(captureIntakeConsents(base)).resolves.toBeUndefined();
+  });
+
+  it('writes nothing the operator did not tick', async () => {
+    wire({});
+    await captureIntakeConsents({ ...base, whatsappUtility: false, destructiveAuthorized: false });
+    expect(calls).toEqual([]);
   });
 });

@@ -309,7 +309,49 @@ export interface IntakeConsents {
  * signature is the dark pattern GDPR Art. 7(2) prohibits.
  * whatsapp_consents is append-only: insert, never update.
  */
+/** What a consent capture actually managed to write. */
+export interface RecordedIntakeConsents {
+  whatsapp: boolean;
+  /** The DESTRUCTIVE_ATTEMPT_AUTHORIZED custody event — no other in-app writer. */
+  destructiveCustody: boolean;
+  destructiveNote: boolean;
+}
+
+/**
+ * Thrown when a requested consent did not fully land. Carries what DID land, so
+ * the surface can name the actual gap instead of inferring one from what the
+ * operator ticked — the two diverge exactly when it matters most.
+ */
+export class IntakeConsentError extends Error {
+  readonly recorded: RecordedIntakeConsents;
+
+  constructor(message: string, recorded: RecordedIntakeConsents) {
+    super(message);
+    this.name = 'IntakeConsentError';
+    this.recorded = recorded;
+  }
+}
+
+/**
+ * Records consent as separable facts, each independently provable. Marketing
+ * scope is deliberately never written at intake — bundling it into a service
+ * signature is the dark pattern GDPR Art. 7(2) prohibits.
+ *
+ * The two consents are attempted independently: a messaging opt-in failing must
+ * not cost the lab the destructive-attempt authorization, which is the legally
+ * significant one. Within the destructive consent the CUSTODY EVENT is appended
+ * first and the note only follows it, because the note can be re-created from any
+ * case screen while the custody event has no other in-app writer — so if only one
+ * of the pair can land, it must be the custody event.
+ */
 export async function captureIntakeConsents(input: IntakeConsents): Promise<void> {
+  const recorded: RecordedIntakeConsents = {
+    whatsapp: false,
+    destructiveCustody: false,
+    destructiveNote: false,
+  };
+  const failures: string[] = [];
+
   if (input.whatsappUtility) {
     const { error } = await supabase.from('whatsapp_consents').insert({
       tenant_id: input.tenantId,
@@ -322,21 +364,13 @@ export async function captureIntakeConsents(input: IntakeConsents): Promise<void
     });
     if (error) {
       logger.error('Error recording intake consent:', error);
-      throw error;
+      failures.push('WhatsApp updates consent');
+    } else {
+      recorded.whatsapp = true;
     }
   }
 
   if (input.destructiveAuthorized) {
-    const { error: noteError } = await supabase.from('case_internal_notes').insert({
-      tenant_id: input.tenantId,
-      case_id: input.caseId,
-      content: 'Customer authorized recovery attempts that may permanently alter the media (captured at check-in).',
-    });
-    if (noteError) {
-      logger.error('Error recording destructive-attempt authorization:', noteError);
-      throw noteError;
-    }
-
     const { error: custodyError } = await supabase.rpc('log_chain_of_custody', {
       p_case_id: input.caseId,
       p_action_category: 'evidence_handling',
@@ -344,9 +378,28 @@ export async function captureIntakeConsents(input: IntakeConsents): Promise<void
       p_description: 'Customer authorized potentially destructive recovery attempts at check-in',
       p_metadata: { source: 'intake_checkin' },
     });
+
     if (custodyError) {
       logger.error('Error logging destructive-attempt custody event:', custodyError);
-      throw custodyError;
+      failures.push('destructive-attempt authorization');
+    } else {
+      recorded.destructiveCustody = true;
+
+      const { error: noteError } = await supabase.from('case_internal_notes').insert({
+        tenant_id: input.tenantId,
+        case_id: input.caseId,
+        content: 'Customer authorized recovery attempts that may permanently alter the media (captured at check-in).',
+      });
+      if (noteError) {
+        logger.error('Error recording destructive-attempt authorization note:', noteError);
+        failures.push('destructive-attempt note');
+      } else {
+        recorded.destructiveNote = true;
+      }
     }
+  }
+
+  if (failures.length > 0) {
+    throw new IntakeConsentError(`Could not record: ${failures.join(', ')}`, recorded);
   }
 }
